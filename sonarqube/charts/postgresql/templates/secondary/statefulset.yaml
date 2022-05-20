@@ -1,0 +1,107 @@
+{{- if eq .Values.architecture "replication" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "postgresql.secondary.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replication.replicationCount }}
+  serviceName: {{ include "postgresql.name" . }}
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      role: slave
+      {{- include "postgresql.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      name: {{ include "postgresql.name" . }}
+      labels:
+        role: slave
+        {{- include "postgresql.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.primary.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.primary.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: postgresql
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          {{- if .Values.primary.securityContext.enabled }}
+          securityContext: {{- omit .Values.primary.securityContext "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          env:
+            - name: BITNAMI_DEBUG
+              value: {{ ternary "true" "false" (.Values.diagnosticMode.enabled) | quote }}
+            - name: POSTGRESQL_PORT_NUMBER
+              value: {{ .Values.primary.service.port | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.primary.dbUsername | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgresql.name" . }}
+                  key: postgres-password
+            {{- if (include "postgresql.database" .) }}
+            - name: POSTGRES_DB
+              value: {{ (include "postgresql.database" .) | quote }}
+            {{- end }}
+            - name: POSTGRESQL_VOLUME_DIR
+              value: "/data/postgresql"
+            - name: PGDATA
+              value: "/data/postgresql/data"
+            - name: POSTGRES_REPLICATION_MODE
+              value: "slave"
+            - name: POSTGRES_REPLICATION_USER
+              value: "repl_user"
+            - name: POSTGRES_REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgresql.name" . }}
+                  key: replication-password
+            - name: POSTGRES_CLUSTER_APP_NAME
+              value: {{ .Values.replication.applicationName }}
+            - name: POSTGRES_MASTER_HOST
+              value: {{ include "postgresql.primary.name" . }}
+            - name: POSTGRES_MASTER_PORT_NUMBER
+              value: {{ .Values.primary.service.port | quote }}
+          ports:
+            - name: tcp-postgresql
+              containerPort: {{ .Values.primary.service.port }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - exec pg_isready -U {{ .Values.primary.dbUsername | quote }} -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - -e
+                - |
+                  exec pg_isready -U {{ .Values.primary.dbUsername | quote }} -h 127.0.0.1 -p 5432
+                  [ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/postgresql/.initialized ]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 6
+          resources: {{- toYaml .Values.primary.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /data/postgresql
+              name: data
+      volumes:
+        - name: data
+          hostPath:
+            path: {{ .Values.secondary.hostPath }}
+            type: Directory
+{{- end }}

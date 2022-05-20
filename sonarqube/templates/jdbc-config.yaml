@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "sonarqube.fullname" . }}-jdbc-config
+data:
+  SONAR_JDBC_USERNAME: {{ .Values.postgresql.primary.dbUsername }}
+  SONAR_JDBC_URL: {{ include "sonarqube.jdbcUrl" . }}

@@ -1,0 +1,17 @@
+{{- if eq .Values.architecture "replication" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "postgresql.secondary.name" . }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.primary.service.type }}
+  ports:
+    - name: tcp-postgresql
+      port: {{ .Values.primary.service.port }}
+      targetPort: tcp-postgresql
+  selector:
+    role: slave
+    {{- include "postgresql.selectorLabels" . | nindent 4 }}
+{{- end }}

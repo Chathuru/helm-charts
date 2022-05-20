@@ -1,0 +1,9 @@
+apiVersion: v2
+name: sonarqube
+description: SonarQube offers Code Quality and Code Security analysis for up to 27 languages. Find Bugs, Vulnerabilities, Security Hotspots and Code Smells throughout your workflow.
+type: application
+version: 1.0.0
+appVersion: 9.4.0
+dependencies:
+  - name: postgresql
+    version: 1.0.0

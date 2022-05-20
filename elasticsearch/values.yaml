@@ -1,0 +1,57 @@
+clusterName: xapihub
+
+replicaCount: 1
+
+image:
+  repository: docker.elastic.co/elasticsearch/elasticsearch
+  pullPolicy: IfNotPresent
+  tag: 7.15.2-amd64
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+
+securityContext:
+   capabilities:
+     drop:
+     - ALL
+   runAsNonRoot: true
+   runAsUser: 1000
+
+service:
+  type: ClusterIP
+  protocol: TCP
+  httpPort: 9200
+  transportPort: 9300
+
+esConfig:
+  elasticsearch.yml: |
+    discovery.type: single-node
+    network.host: [_local_, _site_]
+    node.roles: [master, data, ingest]
+#    xpack.security.enabled: true
+#    xpack.security.authc.realms:
+#      file.file1:
+#        order: 0
+#      native.native1:
+#        order: 1
+#  users: |
+#    admin:$2a$10$1Pp6w8uku7sCDyDn/LIv3OF098l73KIKPuY.sRYeHBlq4S9FT3GLu
+#  users_roles: |
+#    superuser:admin
+
+resources:
+   limits:
+     cpu: 1000m
+     memory: 1024Mi
+   requests:
+     cpu: 500m
+     memory: 512Mi
+
+persistentStorage:
+  enable: false
+  type: ebs
+  hostPath: ""
+  volumeID: ""
+
+nodeSelector: {}

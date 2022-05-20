@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: 14.2.0
+description: Offline Resilience Postgres Database
+name: postgresql
+type: application
+version: 1.0.0

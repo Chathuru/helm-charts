@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      {{- include "elasticsearch.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "elasticsearch.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+      - name: configure-sysctl
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          runAsUser: 0
+          privileged: true
+        command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+      containers:
+      - name: {{ .Chart.Name }}
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        env:
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: cluster.name
+          value: {{ .Values.clusterName | quote }}
+        volumeMounts:
+        - name: esdata
+          mountPath: /var/lib/elastisearch
+        {{- range $path, $config := .Values.esConfig }}
+        - name: esconfig
+          mountPath: /usr/share/elasticsearch/config/{{ $path }}
+          subPath: {{ $path }}
+        {{- end }}
+        readinessProbe:
+          tcpSocket:
+            port: 9200
+          failureThreshold: 3
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 3
+          timeoutSeconds: 5
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.httpPort }}
+        - name: transport
+          containerPort: {{ .Values.service.transportPort }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+        - name: esconfig
+          configMap:
+            name: {{ .Release.Name }}-config
+        - name: esdata
+        {{- if eq .Values.persistentStorage.enable false}}
+          emptyDir: {{ `{}` }}
+        {{- else if eq .Values.persistentStorage.type "ebs" }}
+          awsElasticBlockStore:
+            volumeID: {{ .Values.persistentStorage.volumeID }}
+        {{- else }}
+          hostPath:
+            path: {{ .Values.persistentStorage.hostPath }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}

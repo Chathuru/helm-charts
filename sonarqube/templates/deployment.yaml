@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "sonarqube.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "sonarqube.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "sonarqube.name" . }}
+        release: {{ .Release.Name }}
+      annotations:
+        checksum/init-sysctl: {{ include (print $.Template.BasePath "/init-sysctl.yaml") . | sha256sum }}
+        checksum/plugins: {{ include (print $.Template.BasePath "/install-plugins.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+      {{ toYaml .Values.securityContext | indent 8 }}
+      initContainers:
+        - name: init-sysctl
+          image: busybox:1.32
+          imagePullPolicy: {{ .Values.image.pullPolicy  }}
+          securityContext:
+            privileged: true
+          command: ["sh",
+            "-e",
+            "/tmp/scripts/init_sysctl.sh"]
+          volumeMounts:
+            - name: init-sysctl
+              mountPath: /tmp/scripts/
+      {{- if .Values.plugins.install }}
+        - name: install-plugins
+          image: curlimages/curl:7.76.1
+          imagePullPolicy: {{ .Values.image.pullPolicy  }}
+          command: ["sh",
+            "-e",
+            "/tmp/scripts/install_plugins.sh"]
+          volumeMounts:
+            - mountPath: {{ .Values.sonarqubeFolder }}/extensions/downloads
+              name: sonarqube
+              subPath: extensions/downloads
+            - mountPath: {{ .Values.sonarqubeFolder }}/lib/common
+              name: sonarqube
+              subPath: lib/common
+            - name: install-plugins
+              mountPath: /tmp/scripts/
+          securityContext:
+            privileged: true
+      {{- end }}
+        - name: "wait-for-db"
+          image: "busybox:1.32"
+          imagePullPolicy: {{ .Values.image.pullPolicy  }}
+          command: ["/bin/sh", "-c", "for i in $(seq 1 200); do nc -z -w3 {{ include "sonarqube.postgresql" . }} 5432 && exit 0 || sleep 2; done; exit 1"]
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ tpl .Values.image.tag . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.internalPort }}
+              protocol: TCP
+          env:
+            - name: SONAR_JDBC_PASSWORD
+              value: {{ .Values.postgresql.primary.dbPassword | quote }}
+            - name: SONAR_WEB_SYSTEMPASSCODE
+              value: {{ .Values.monitoringPasscode }}
+            - name: SONAR_WEB_CONTEXT
+              value: {{ .Values.sonarWebContext }}
+          envFrom:
+            - configMapRef:
+                name: {{ template "sonarqube.fullname" . }}-jdbc-config
+          livenessProbe:
+            httpGet:
+              scheme: HTTP
+              path: {{ .Values.livenessProbe.sonarWebContext }}api/system/liveness
+              port: http
+              httpHeaders:
+                - name: X-Sonar-Passcode
+                  value: {{ .Values.monitoringPasscode }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.sonarWebContext }}api/system/status
+              port: http
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+          {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - mountPath: {{ .Values.sonarqubeFolder }}/data
+              name: sonarqube
+              subPath: data
+            - mountPath: {{ .Values.sonarqubeFolder }}/temp
+              name: sonarqube
+              subPath: temp
+            - mountPath: {{ .Values.sonarqubeFolder }}/logs
+              name: sonarqube
+              subPath: logs
+            - name: tmp-dir
+              mountPath: /tmp
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: init-sysctl
+        configMap:
+          name: {{ template "sonarqube.fullname" . }}-init-sysctl
+          items:
+            - key: init_sysctl.sh
+              path: init_sysctl.sh
+      - name: install-plugins
+        configMap:
+          name: {{ template "sonarqube.fullname" . }}-install-plugins
+          items:
+            - key: install_plugins.sh
+              path: install_plugins.sh
+      - name: tmp-dir
+        emptyDir: {}
+      - name: sonarqube
+      {{- if eq .Values.persistentStorage.enabled false }}
+        emptyDir: {{ `{}`}}
+      {{- else if eq .Values.persistentStorage.type "ebs" }}
+        awsElasticBlockStore:
+          volumeID: {{ .Values.persistentStorage.volumeID }}
+      {{- else }}
+        hostPath:
+          path: {{ .Values.persistentStorage.hostPath }}
+      {{- end}}
