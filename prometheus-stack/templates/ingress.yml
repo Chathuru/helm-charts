@@ -1,19 +1,28 @@
+{{- if .Values.ingress.enable }}
+{{- if or .Values.enable.prometheus .Values.enable.grafana }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ingress
+  name: {{ .Release.Name}}-ingress
 spec:
   ingressClassName: nginx
   rules:
+  {{- if .Values.enable.prometheus }}
   - http:
       paths:
       - backend:
           service:
-            name: prometheus
+            name: prometheus-service
             port:
               number: 9090
-        path: /prometheus
+        {{- if .Values.prometheus.reverseProxy }}
+        path: {{ .Values.prometheus.externalUrl }}
+        {{- else }}
+        path: /
+        {{- end }}
         pathType: Prefix
+  {{- end }}
+  {{- if .Values.enable.grafana }}
   - http:
       paths:
       - backend:
@@ -23,3 +32,6 @@ spec:
               number: 3000
         path: /grafana
         pathType: Prefix
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -1,7 +1,8 @@
+{{- if .Values.enable.prometheus }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: prometheus
+  name: prometheus-service
   annotations:
       prometheus.io/scrape: 'true'
       prometheus.io/port:   '9090'
@@ -12,3 +13,4 @@ spec:
       targetPort: 9090
   selector:
     app: prometheus
+{{- end }}

@@ -1,0 +1,20 @@
+enable:
+  prometheus: true
+  grafana: true
+  nodeExporter: false
+  kubeStateMetrics: false
+
+prometheus:
+  reverseProxy: true
+  externalUrl: /prometheus
+  routePrefix: /prometheus
+
+  basicAuth:
+    enable: true
+
+grafana:
+  reverseProxy: true
+  rootUrl: '%(protocol)s://%(domain)s:%(http_port)s/grafana'
+
+ingress:
+  enable: false

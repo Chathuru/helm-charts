@@ -1,3 +1,4 @@
+{{- if .Values.enable.prometheus }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,7 +8,7 @@ metadata:
 data:
   web.yml: |-
     basic_auth_users:
-      admin: $2b$12$jefst9cQ10UOFT0JNhQzqufBLuzw/7ccqrmUeGwmSWruXK7iwIJwW
+      admin: $2b$12$v3Fd1UhW0Dbe109F3BopOOESGhL3CsRK89W1Az3YxUSaOSY0o.5wy
   prometheus.yml: |-
     global:
       scrape_interval: 5s
@@ -117,6 +118,11 @@ data:
         - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
           action: keep
           regex: true
+        - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+          action: replace
+          regex: ([^:]+)(?::\d+)?;(\d+)
+          replacement: $1:$2
+          target_label: __address__
         - source_labels: [__meta_kubernetes_pod_annotation_node_exporter]
           action: drop
           regex: true
@@ -143,3 +149,4 @@ data:
           action: replace
           target_label: __metrics_path__
           regex: (.+)
+{{- end }}

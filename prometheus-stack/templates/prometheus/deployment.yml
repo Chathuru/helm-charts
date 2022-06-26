@@ -1,3 +1,4 @@
+{{- if .Values.enable.prometheus }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -9,6 +10,8 @@ spec:
       app: prometheus
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/prometheus/config-map.yml") . | sha256sum }}
       labels:
         app: prometheus
     spec:
@@ -19,6 +22,13 @@ spec:
           - "--config.file=/etc/prometheus/prometheus.yml"
           - "--storage.tsdb.path=/prometheus/"
           - "--web.enable-lifecycle"
+          {{- if .Values.prometheus.reverseProxy }}
+          - "--web.external-url={{ .Values.prometheus.externalUrl }}"
+          - "--web.route-prefix={{ .Values.prometheus.routePrefix }}"
+          {{- end }}
+          {{- if .Values.prometheus.basicAuth.enable }}
+          - "--web.config.file=/etc/prometheus/web.yml"
+          {{- end }}
         ports:
           - containerPort: 9090
         volumeMounts:
@@ -38,3 +48,4 @@ spec:
           name: prometheus-server-conf
       - name: prometheus-storage-volume
         emptyDir: {}
+{{- end }}

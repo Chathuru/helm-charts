@@ -1,3 +1,4 @@
+{{- if .Values.enable.grafana }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,6 +12,8 @@ spec:
       app: grafana
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/grafana/config-map.yml") . | sha256sum }}
       labels:
         app: grafana
     spec:
@@ -19,7 +22,14 @@ spec:
         name: grafana
         env:
         - name: GF_SECURITY_ADMIN_PASSWORD
-          value: admin
+          value: eignaUTE
+        {{- if .Values.grafana.reverseProxy }}
+        - name: GF_SERVER_ROOT_URL
+          value: {{ .Values.grafana.rootUrl | quote }}
+        - name: GF_SERVER_SERVE_FROM_SUB_PATH
+          value: "true"
+        {{- end }}
+        #- name: GF_SERVER_DOMAIN
         ports:
         - containerPort: 3000
         volumeMounts:
@@ -34,3 +44,4 @@ spec:
           name: grafana-datasources
       - name: grafana-persistent-storage
         emptyDir: {}
+{{- end }}
