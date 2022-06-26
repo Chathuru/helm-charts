@@ -1,0 +1,71 @@
+replicaCount: 1
+
+image:
+  name: bitnami/cassandra:4.0
+  pullPolicy: IfNotPresent
+
+clusterDomain: cluster.local
+
+dbUser:
+  user: cassandra
+  password: "cassandra"
+
+cluster:
+  name: cassandra
+  seedCount: 1
+  numTokens: 256
+  datacenter: dc1
+  rack: rack1
+  endpointSnitch: SimpleSnitch
+
+podSecurityContext:
+  enabled: true
+  fsGroup: 1001
+
+containerSecurityContext:
+  enabled: true
+  runAsUser: 1001
+  runAsNonRoot: true
+
+existingConfiguration: ""
+
+persistence:
+  enabled: false
+  mountPath: /bitnami/cassandra
+
+resources: {}
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 30
+  successThreshold: 1
+  failureThreshold: 5
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 30
+  successThreshold: 1
+  failureThreshold: 5
+
+startupProbe:
+  enabled: false
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 60
+
+containerPorts:
+  intra: 7000
+  cql: 9042
+
+service:
+  type: ClusterIP
+  ports:
+    cql: 9042
+  externalTrafficPolicy: Cluster
+

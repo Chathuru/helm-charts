@@ -1,0 +1,7 @@
+apiVersion: v2
+name: cassandra
+appVersion: 4.0.4
+version: 0.0.1
+description: Apache Cassandra is an open source distributed database management system
+  designed to handle large amounts of data across many servers, providing high availability
+  with no single point of failure.

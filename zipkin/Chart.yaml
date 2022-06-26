@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: 2.23.16
+name: zipkin
+description: A Zipkin helm chart for kubernetes
+type: application
+version: 0.0.1
