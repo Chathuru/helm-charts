@@ -15,4 +15,8 @@ spec:
               service:
                 name: {{ include "zipkin.fullname" . }}
                 port:
+                  {{- if .Values.basicAuth.enable }}
+                  number: 80
+                  {{- else }}
                   number: {{ .Values.service.port }}
+                  {{- end }}

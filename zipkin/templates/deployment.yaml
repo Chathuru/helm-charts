@@ -15,6 +15,20 @@ spec:
         {{- include "zipkin.selectorLabels" . | nindent 8 }}
     spec:
       containers:
+        {{- if .Values.basicAuth.enable }}
+        - name: nginx
+          image: nginx:1.22
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+          - mountPath: /etc/nginx/nginx.conf
+            name: nginx-conf
+            subPath: nginx.conf
+          - mountPath: /etc/nginx/.htpasswd
+            name: nginx-htpasswd
+            subPath: .htpasswd
+        {{- end }}
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
@@ -41,3 +55,14 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.basicAuth.enable }}
+      volumes:
+      - name: nginx-conf
+        configMap:
+          defaultMode: 420
+          name: {{ include "zipkin.fullname" . }}
+      - name: nginx-htpasswd
+        configMap:
+          defaultMode: 420
+          name: {{ include "zipkin.fullname" . }}-htpasswd
+      {{- end }}

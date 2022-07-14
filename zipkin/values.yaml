@@ -26,9 +26,14 @@ resources:
     cpu: 100m
     memory: 128Mi
 
+basicAuth:
+  enable: true
+  username: zipkin
+  password: teRWANTE
+
 zipkin:
   storage:
-    type: cassandra3 # mem, cassandra3
+    type: mem # mem, cassandra3
     cassandra:
       host: cassandra-headless
       username: cassandra

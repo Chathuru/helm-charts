@@ -11,5 +11,11 @@ spec:
       targetPort: 9411
       protocol: TCP
       name: http-query
+    {{- if .Values.basicAuth.enable }}
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+    {{- end }}
   selector:
     {{- include "zipkin.selectorLabels" . | nindent 4 }}
