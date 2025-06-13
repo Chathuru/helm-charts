@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grafana
+  name: grafana
+  namespace: monitoring
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: grafana
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: EugKD5N9wrTn
+        - name: GF_PATHS_DATA
+          value: /var/lib/grafana/
+        - name: GF_PATHS_LOGS
+          value: /var/log/grafana
+        - name: GF_PATHS_PLUGINS
+          value: /var/lib/grafana/plugins
+        - name: GF_PATHS_PROVISIONING
+          value: /etc/grafana/provisioning
+        image: grafana/grafana:12.0.1
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 10
+          httpGet:
+            path: /api/health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 30
+        name: grafana
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /api/health
+            port: 3000
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        volumeMounts:
+        - mountPath: /var/lib/grafana
+          name: grafana-storage
+        - mountPath: /etc/grafana/provisioning/datasources/datasource.yaml
+          name: grafana-datasources
+          subPath: datasource.yaml
+        - mountPath: /etc/grafana/grafana.ini
+          name: grafana-config
+          subPath: grafana.ini
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - chown
+        - -R
+        - 472:472
+        - /var/lib/grafana
+        image: alpine:3.20.3
+        imagePullPolicy: IfNotPresent
+        name: init-chown-data
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /var/lib/grafana
+          name: grafana-storage
+      securityContext:
+        fsGroup: 472
+        runAsGroup: 472
+        runAsNonRoot: true
+        runAsUser: 472
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: grafana-datasources
+        name: grafana-datasources
+      - configMap:
+          defaultMode: 420
+          name: grafana-config
+        name: grafana-config
+      - name: grafana-storage
+        persistentVolumeClaim:
+          claimName: grafana
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: monitoring
+data:
+  grafana.ini: |
+    [analytics]
+    check_for_updates = true
+    [grafana_net]
+    url = https://grafana.net
+    [log]
+    mode = console
+    [paths]
+    data = /var/lib/grafana/
+    logs = /var/log/grafana
+    plugins = /var/lib/grafana/plugins
+    provisioning = /etc/grafana/provisioning
+    [server]
+    domain = grafana.global-demo.restrata.net
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  datasource.yaml: |-
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-service:9090
+        editable: true
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 40Gi
+  storageClassName: gp2
+  volumeMode: Filesystem

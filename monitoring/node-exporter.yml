@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: monitoring
+spec:
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      name: node-exporter
+  template:
+    metadata:
+      annotations:
+        node_exporter: "true"
+        prometheus.io/scrape: "true"
+      labels:
+        name: node-exporter
+    spec:
+      containers:
+      - args:
+        - --path.procfs=/host/proc
+        - --path.sysfs=/host/sys
+        image: quay.io/prometheus/node-exporter:v1.9.1
+        imagePullPolicy: IfNotPresent
+        name: node-exporter
+        ports:
+        - containerPort: 9100
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 10m
+            memory: 50Mi
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        volumeMounts:
+        - mountPath: /host/proc
+          name: proc
+          readOnly: true
+        - mountPath: /host/sys
+          name: sys
+          readOnly: true
+      hostNetwork: true
+      hostPID: true
+      volumes:
+      - hostPath:
+          path: /proc
+          type: ""
+        name: proc
+      - hostPath:
+          path: /sys
+          type: ""
+        name: sys
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
